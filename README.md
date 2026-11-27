@@ -76,19 +76,19 @@ The workflow is designed to generate structured evaluation results, including:
 
 ### Workflow Overview
 
-![Workflow Overview](screenshots/workflow-overview.png)
+![Workflow Overview](workflow-overview.png)
 
 ### ATS Evaluation
 
-![ATS Evaluation](screenshots/ats-evaluation.png)
+![ATS Evaluation](ats_evaluation.png)
 
 ### Google Sheets Results
 
-![Google Sheets Results](screenshots/google-sheets-results.png)
+![Google Sheets Results](google-sheets-results.png)
 
 ### Human Review
 
-![Human Review](screenshots/human-review.png)
+![Human Review](human-review.png)
 
 ## Responsible AI & Human Oversight
 
