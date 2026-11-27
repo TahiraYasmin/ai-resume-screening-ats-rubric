@@ -1,0 +1,249 @@
+
+{
+  "name": "Resume Screening with ATS Rubric",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_DRIVE_FOLDER_ID",
+          "mode": "id"
+        },
+        "event": "fileCreated",
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        }
+      },
+      "name": "Google Drive Trigger",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        }
+      },
+      "name": "Download Resume PDF",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "operation": "pdf"
+      },
+      "name": "Extract Resume Text",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "job_title",
+              "value": "Junior AI Automation Engineer",
+              "type": "string"
+            },
+            {
+              "name": "job_description",
+              "value": "Evaluate candidates for a Junior AI Automation Engineer role. Assess relevant technical knowledge, practical experience, projects, education, problem-solving, communication, and additional relevant skills.",
+              "type": "string"
+            },
+            {
+              "name": "ats_rubric",
+              "value": "Technical Skills: 30; Experience & Projects: 25; Education & Certifications: 15; Problem Solving: 15; Communication: 10; Additional Skills: 5. Total: 100.",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "name": "Prepare Job Requirements",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "Evaluate the candidate resume against the provided job requirements and ATS rubric. Resume text: {{ $json.text }}. Job title: {{ $json.job_title }}. Job description: {{ $json.job_description }}. Rubric: {{ $json.ats_rubric }}. Award points only for evidence supported by the resume. Do not invent qualifications or experience. Assess only job-related criteria. Do not use age, gender, religion, ethnicity, disability, or other protected characteristics. Do not automatically reject candidates. Every candidate must remain subject to human review.",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "name": "AI Resume Screening Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [900, 0]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.5-flash-lite",
+        "options": {}
+      },
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [900, 220]
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": {
+          "candidate_name": "Candidate Name",
+          "job_title": "Junior AI Automation Engineer",
+          "total_score": 0,
+          "technical_skills": 0,
+          "experience_projects": 0,
+          "education_certifications": 0,
+          "problem_solving": 0,
+          "communication": 0,
+          "additional_skills": 0,
+          "strengths": [],
+          "missing_requirements": [],
+          "evidence": [],
+          "recommendation": "Human Review Required",
+          "review_notes": ""
+        }
+      },
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [1120, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json.output ?? $json;\nconst limits = {\n  technical_skills: 30,\n  experience_projects: 25,\n  education_certifications: 15,\n  problem_solving: 15,\n  communication: 10,\n  additional_skills: 5\n};\nlet calculatedTotal = 0;\nconst errors = [];\nfor (const [key, max] of Object.entries(limits)) {\n  const score = Number(data[key]);\n  if (!Number.isFinite(score) || score < 0 || score > max) {\n    errors.push(`${key} must be between 0 and ${max}`);\n  }\n  calculatedTotal += Number.isFinite(score) ? score : 0;\n}\nif (calculatedTotal !== Number(data.total_score)) {\n  errors.push('Total score does not match category scores');\n}\nreturn [{ json: {\n  ...data,\n  total_score: calculatedTotal,\n  recommendation: 'Human Review Required',\n  validation_status: errors.length ? 'Failed' : 'Passed',\n  validation_errors: errors\n}}];"
+      },
+      "name": "Validate ATS Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 0]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEETS_DOCUMENT_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "YOUR_SHEET_NAME",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData"
+        }
+      },
+      "name": "Save Results to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1560, 0]
+    }
+  ],
+  "connections": {
+    "Google Drive Trigger": {
+      "main": [
+        [
+          {
+            "node": "Download Resume PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Resume PDF": {
+      "main": [
+        [
+          {
+            "node": "Extract Resume Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Resume Text": {
+      "main": [
+        [
+          {
+            "node": "Prepare Job Requirements",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Job Requirements": {
+      "main": [
+        [
+          {
+            "node": "AI Resume Screening Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Resume Screening Agent": {
+      "main": [
+        [
+          {
+            "node": "Validate ATS Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Resume Screening Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Resume Screening Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate ATS Score": {
+      "main": [
+        [
+          {
+            "node": "Save Results to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
